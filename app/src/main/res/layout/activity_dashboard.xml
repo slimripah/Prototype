@@ -23,4 +23,12 @@
         android:layout_below="@id/wearable"
         android:layout_margin="20dp" />
 
+    <Button
+        android:id="@+id/food"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/food"
+        android:layout_below="@id/points"
+        android:layout_margin="20dp" />
+
 </RelativeLayout>
