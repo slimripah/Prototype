@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Prototype</string>
+    <string name="todo">image</string>
+    <string name="one">Wearable</string>
+    <string name="two">points system</string>
+    <string name="age">Age</string>
+    <string name="steps">Steps</string>
+    <string name="calc">calculate points</string>
+</resources>
