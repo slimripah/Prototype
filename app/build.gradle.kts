@@ -47,4 +47,8 @@ dependencies {
     // Google Sign-In API
     implementation(libs.play.services.auth)
 
+    //TensorFlowDependencies
+    implementation(libs.tensorflow.lite)
+    implementation(libs.tensorflow.lite.task.vision)
+
 }

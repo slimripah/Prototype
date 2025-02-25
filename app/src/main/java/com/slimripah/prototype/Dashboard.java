@@ -27,6 +27,7 @@ public class Dashboard extends AppCompatActivity {
         // Find buttons by ID
         Button wearableButton = findViewById(R.id.wearable);
         Button pointsButton = findViewById(R.id.points);
+        Button caloriesButton = findViewById(R.id.food);
 
         // Set click listener for Wearable button
         wearableButton.setOnClickListener(v -> {
@@ -37,6 +38,12 @@ public class Dashboard extends AppCompatActivity {
         // Set click listener for Points button
         pointsButton.setOnClickListener(v -> {
             Intent intent = new Intent(Dashboard.this, Points.class);
+            startActivity(intent);
+        });
+
+        // Set click listener for Food button
+        caloriesButton.setOnClickListener(v -> {
+            Intent intent = new Intent(Dashboard.this, Calories.class);
             startActivity(intent);
         });
 
