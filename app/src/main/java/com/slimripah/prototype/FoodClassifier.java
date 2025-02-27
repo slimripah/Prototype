@@ -1,7 +1,5 @@
 package com.slimripah.prototype;
 
-import static org.tensorflow.lite.support.common.FileUtil.loadLabels;
-
 import android.content.Context;
 import android.graphics.Bitmap;
 
@@ -9,12 +7,18 @@ import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.support.image.TensorImage;
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
 
-import java.io.FileInputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+
+import android.content.res.AssetFileDescriptor;
+import java.io.FileInputStream;
 
 public class FoodClassifier {
 
@@ -30,29 +34,27 @@ public class FoodClassifier {
     }
 
     private MappedByteBuffer loadModelFile(Context context) throws IOException {
-        FileInputStream fileInputStream = new FileInputStream(context.getAssets().openFd(MODEL_NAME).getFileDescriptor());
-        FileChannel fileChannel = fileInputStream.getChannel();
-        long startOffset = context.getAssets().openFd(MODEL_NAME).getStartOffset();
-        long declaredLength = context.getAssets().openFd(MODEL_NAME).getDeclaredLength();
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+        AssetFileDescriptor fileDescriptor = context.getAssets().openFd(MODEL_NAME);
+        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
+        FileChannel fileChannel = inputStream.getChannel();
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, fileDescriptor.getStartOffset(), fileDescriptor.getDeclaredLength());
     }
 
     private List<String> loadLabels(Context context) throws IOException {
         List<String> labelList = new ArrayList<>();
-        FileInputStream fileInputStream = context.openFileInput(LABELS_FILE);
-        byte[] bytes = new byte[fileInputStream.available()];
-        fileInputStream.read(bytes);
-        fileInputStream.close();
-        String[] lines = new String(bytes).split("\n");
-        for (String line : lines) {
-            labelList.add(line.trim());
+        try (InputStream inputStream = context.getAssets().open(LABELS_FILE);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                labelList.add(line.trim());
+            }
         }
         return labelList;
     }
 
     public String classifyFood(Bitmap bitmap) {
         Bitmap resizedBitmap = Bitmap.createScaledBitmap(bitmap, 224, 224, true);
-        TensorImage tensorImage = new TensorImage();
+        TensorImage tensorImage = new TensorImage(org.tensorflow.lite.DataType.FLOAT32);
         tensorImage.load(resizedBitmap);
 
         TensorBuffer outputBuffer = TensorBuffer.createFixedSize(new int[]{1, labels.size()}, org.tensorflow.lite.DataType.FLOAT32);
@@ -70,7 +72,8 @@ public class FoodClassifier {
     }
 
     public void close() {
-        interpreter.close();
+        if (interpreter != null) {
+            interpreter.close();
+        }
     }
-
 }
