@@ -46,7 +46,7 @@
         <!-- Google Fit Integration -->
         <meta-data
             android:name="com.google.android.gms.auth.api.fitness"
-            android:value="true" />
+            android:value="531492010523-tf28men3d1ruecbideifcn7fssmi847i.apps.googleusercontent.com" />
     </application>
 
 </manifest>

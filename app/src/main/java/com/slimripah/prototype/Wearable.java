@@ -1,11 +1,13 @@
 package com.slimripah.prototype;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -13,20 +15,28 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.fitness.Fitness;
-import com.google.android.gms.fitness.FitnessOptions;
-import com.google.android.gms.fitness.data.DataPoint;
 import com.google.android.gms.fitness.data.DataType;
 import com.google.android.gms.fitness.request.DataReadRequest;
 import com.google.android.gms.fitness.result.DataReadResponse;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 
-import java.util.concurrent.Executors;
+import java.util.Calendar;
 import java.util.concurrent.TimeUnit;
 
 public class Wearable extends AppCompatActivity {
 
-    private static final int GOOGLE_FIT_PERMISSIONS_REQUEST_CODE = 1;
-    private TextView stepCountTextView, heartRateTextView;
+    private static final int GOOGLE_SIGN_IN_REQUEST_CODE = 1001;
+    private static final String TAG = "GoogleFit";
+
+    private GoogleSignInClient googleSignInClient;
+
+    private TextView stepsTextView, heartRateTextView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,89 +50,99 @@ public class Wearable extends AppCompatActivity {
             return insets;
         });
 
-        stepCountTextView = findViewById(R.id.stepsTextView);
+        stepsTextView = findViewById(R.id.stepsTextView);
         heartRateTextView = findViewById(R.id.heartRateTextView);
 
-        requestGoogleFitPermissions();
+        //Configure Google Sign-In
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .requestScopes(new com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/fitness.activity.read"),
+                                new com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/fitness.heart_rate.read"))
+                        .build();
+
+        googleSignInClient = GoogleSignIn.getClient(this, gso);
+
+        //Check if already signed in
+        GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
+        if (account == null) {
+            signIn();
+        } else {
+            readFitnessData (account);
+        }
 
     }
 
-    private void requestGoogleFitPermissions() {
-        FitnessOptions fitnessOptions = FitnessOptions.builder()
-                .addDataType(DataType.TYPE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
-                .addDataType(DataType.TYPE_HEART_RATE_BPM, FitnessOptions.ACCESS_READ)
-                .build();
-
-        GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(this, fitnessOptions);
-
-        if (!GoogleSignIn.hasPermissions(account, fitnessOptions)) {
-            GoogleSignIn.requestPermissions(
-                    this,
-                    GOOGLE_FIT_PERMISSIONS_REQUEST_CODE,
-                    account,
-                    fitnessOptions
-            );
-        } else {
-            fetchGoogleFitData();
-        }
+    private void signIn() {
+        Intent signInIntent = googleSignInClient.getSignInIntent();
+        startActivityForResult(signInIntent, GOOGLE_SIGN_IN_REQUEST_CODE);
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == GOOGLE_FIT_PERMISSIONS_REQUEST_CODE) {
-            fetchGoogleFitData();
+
+        if (requestCode == GOOGLE_SIGN_IN_REQUEST_CODE) {
+            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+            try {
+                GoogleSignInAccount account = task.getResult(ApiException.class);
+                if (account != null) {
+                    readFitnessData(account);
+                }
+            } catch (ApiException e) {
+                Log.e(TAG, "Sign-in failed: " + e.getStatusCode());
+                Toast.makeText(this, "Google Sign-In Failed!", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
-    private void fetchGoogleFitData() {
-        GoogleSignInAccount account = GoogleSignIn.getAccountForExtension(this, FitnessOptions.builder()
-                .addDataType(DataType.TYPE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
-                .addDataType(DataType.TYPE_HEART_RATE_BPM, FitnessOptions.ACCESS_READ)
-                .build());
+    private void readFitnessData(GoogleSignInAccount account) {
 
         if (account == null) {
-            Toast.makeText(this, "Google Fit not connected", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Google Account is null");
             return;
         }
+
+        //Create request to read steps and heart rate
+        Calendar cal = Calendar.getInstance();
+        long endTime = cal.getTimeInMillis();
+        cal.add(Calendar.DAY_OF_YEAR, -1);
+        long startTime = cal.getTimeInMillis();
 
         DataReadRequest readRequest = new DataReadRequest.Builder()
                 .read(DataType.TYPE_STEP_COUNT_DELTA)
                 .read(DataType.TYPE_HEART_RATE_BPM)
-                .setTimeRange(1, System.currentTimeMillis(), TimeUnit.MILLISECONDS)
+                .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
                 .build();
 
+        //Request fitness data
         Fitness.getHistoryClient(this, account)
                 .readData(readRequest)
-                .addOnSuccessListener(response -> displayFitData(response))
-                .addOnFailureListener(e -> Log.e("GoogleFit", "Failed to read data", e));
-    }
+                .addOnSuccessListener(new OnSuccessListener<DataReadResponse>() {
+                    @Override
+                    public void onSuccess(DataReadResponse dataReadResponse) {
+                        int totalSteps = dataReadResponse.getDataSet(DataType.TYPE_STEP_COUNT_DELTA)
+                                .getDataPoints().stream()
+                                .mapToInt(dp -> dp.getValue(dp.getDataType().getFields().get(0)).asInt())
+                                .sum();
 
-    private void displayFitData(DataReadResponse response) {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            int totalSteps = 0;
-            float heartRate = 0;
+                        float heartRate = (float) dataReadResponse.getDataSet(DataType.TYPE_HEART_RATE_BPM)
+                                .getDataPoints().stream()
+                                .mapToDouble(dp -> dp.getValue(dp.getDataType().getFields().get(0)).asFloat())
+                                .average().orElse(0.0);
 
-            if (response.getDataSet(DataType.TYPE_STEP_COUNT_DELTA) != null) {
-                for (DataPoint dp : response.getDataSet(DataType.TYPE_STEP_COUNT_DELTA).getDataPoints()) {
-                    totalSteps += dp.getValue(dp.getDataType().getFields().get(0)).asInt();
-                }
-            }
+                        stepsTextView.setText("Steps: " + totalSteps);
+                        heartRateTextView.setText("Heart Rate: " + heartRate + "BPM");
 
-            if (response.getDataSet(DataType.TYPE_HEART_RATE_BPM) != null) {
-                for (DataPoint dp : response.getDataSet(DataType.TYPE_HEART_RATE_BPM).getDataPoints()) {
-                    heartRate = dp.getValue(dp.getDataType().getFields().get(0)).asFloat();
-                }
-            }
+                        Log.d(TAG, "Steps: " + totalSteps + ", Heart Rate: " + heartRate);
 
-            final int finalSteps = totalSteps;
-            final float finalHeartRate = heartRate;
-
-            runOnUiThread(() -> {
-                stepCountTextView.setText("Steps: " + finalSteps);
-                heartRateTextView.setText("Heart Rate: " + finalHeartRate + " bpm");
-            });
-        });
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Log.e(TAG, "Failed to read data", e);
+                    }
+                });
     }
 
 }

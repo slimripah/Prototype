@@ -87,7 +87,7 @@ public class Calories extends AppCompatActivity {
                     String foodLabel = foodClassifier.classifyFood(photo);
                     resultTextView.setText("Detected: " + foodLabel);
                 } else {
-                    Toast.makeText(this, "FoodClassifier is not initialized!", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Food not in trained AI Model", Toast.LENGTH_LONG).show();
                 }
             } else {
                 Toast.makeText(this, "Failed to capture image!", Toast.LENGTH_LONG).show();
