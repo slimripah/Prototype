@@ -117,32 +117,24 @@ public class Wearable extends AppCompatActivity {
         //Request fitness data
         Fitness.getHistoryClient(this, account)
                 .readData(readRequest)
-                .addOnSuccessListener(new OnSuccessListener<DataReadResponse>() {
-                    @Override
-                    public void onSuccess(DataReadResponse dataReadResponse) {
-                        int totalSteps = dataReadResponse.getDataSet(DataType.TYPE_STEP_COUNT_DELTA)
-                                .getDataPoints().stream()
-                                .mapToInt(dp -> dp.getValue(dp.getDataType().getFields().get(0)).asInt())
-                                .sum();
+                .addOnSuccessListener(dataReadResponse -> {
+                    int totalSteps = dataReadResponse.getDataSet(DataType.TYPE_STEP_COUNT_DELTA)
+                            .getDataPoints().stream()
+                            .mapToInt(dp -> dp.getValue(dp.getDataType().getFields().get(0)).asInt())
+                            .sum();
 
-                        float heartRate = (float) dataReadResponse.getDataSet(DataType.TYPE_HEART_RATE_BPM)
-                                .getDataPoints().stream()
-                                .mapToDouble(dp -> dp.getValue(dp.getDataType().getFields().get(0)).asFloat())
-                                .average().orElse(0.0);
+                    float heartRate = (float) dataReadResponse.getDataSet(DataType.TYPE_HEART_RATE_BPM)
+                            .getDataPoints().stream()
+                            .mapToDouble(dp -> dp.getValue(dp.getDataType().getFields().get(0)).asFloat())
+                            .average().orElse(0.0);
 
-                        stepsTextView.setText("Steps: " + totalSteps);
-                        heartRateTextView.setText("Heart Rate: " + heartRate + "BPM");
+                    stepsTextView.setText("Steps: " + totalSteps);
+                    heartRateTextView.setText("Heart Rate: " + heartRate + "BPM");
 
-                        Log.d(TAG, "Steps: " + totalSteps + ", Heart Rate: " + heartRate);
+                    Log.d(TAG, "Steps: " + totalSteps + ", Heart Rate: " + heartRate);
 
-                    }
                 })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Log.e(TAG, "Failed to read data", e);
-                    }
-                });
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to read data", e));
     }
 
 }
